@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Razorpay Test Payments</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    body { font-family: monospace; background: #0d1117; color: #c9d1d9; padding: 40px; }
+    h1   { color: #58a6ff; margin-bottom: 4px; }
+    p    { color: #8b949e; margin-bottom: 32px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+             padding: 20px 24px; margin-bottom: 16px; }
+    .label { font-size: 16px; font-weight: bold; color: #f0f6fc; }
+    .hint  { font-size: 13px; color: #8b949e; margin: 8px 0 14px; }
+    button { background: #238636; color: #fff; border: none; padding: 10px 20px;
+              border-radius: 6px; cursor: pointer; font-size: 14px; font-family: monospace; }
+    button:hover { background: #2ea043; }
+  </style>
+</head>
+<body>
+  <h1>Razorpay Recovery Agent — Test Payments</h1>
+  <p>Pay each scenario with the card shown. Then run <code>python main.py</code> to see the agent recover them.</p>
+  <div id="scenarios"></div>
+
+  <script>
+    const KEY_ID    = "rzp_test_SqJbci2z1R3w8e";
+    const SCENARIOS = [{"label": "BANK_TECHNICAL \u2014 RS.15,000", "amount": 1500000, "description": "Laptop purchase - simulate bank gateway failure", "hint": "Card: 5267 3181 8797 5449 | OTP: 9999 \u2192 generic failure", "order_id": "order_SqK2efigwAkJum"}, {"label": "INSUFFICIENT_FUNDS \u2014 RS.2,999", "amount": 299900, "description": "Annual subscription - simulate insufficient funds", "hint": "Card: 5267 3181 8797 5449 | OTP: 9999 \u2192 generic failure", "order_id": "order_SqK2fCue8xvctV"}, {"label": "CARD_EXPIRED \u2014 RS.750", "amount": 75000, "description": "Course payment - simulate expired/invalid card", "hint": "Card: 4111 1111 1111 1111 | OTP: 9999 \u2192 generic failure", "order_id": "order_SqK2fpIDxMf6LM"}, {"label": "SUCCESS (control) \u2014 RS.500", "amount": 50000, "description": "Test successful payment for baseline", "hint": "Card: 4111 1111 1111 1111 | OTP: 1234 \u2192 success", "order_id": "order_SqK2gEwbH15xvs"}];
+
+    const container = document.getElementById("scenarios");
+
+    SCENARIOS.forEach((s, i) => {
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `
+        <div class="label">${s.label}</div>
+        <div class="hint">${s.hint}</div>
+        <button onclick="pay(${i})">Open Checkout</button>
+      `;
+      container.appendChild(div);
+    });
+
+    function pay(i) {
+      const s = SCENARIOS[i];
+      const rzp = new Razorpay({
+        key:         KEY_ID,
+        order_id:    s.order_id,
+        amount:      s.amount,
+        currency:    "INR",
+        name:        "Recovery Agent Test",
+        description: s.description,
+        prefill:     { name: "Test User", email: "test@razorpay.com", contact: "9999999999" },
+        theme:       { color: "#238636" },
+        handler: function(response) {
+          alert("Payment succeeded: " + response.razorpay_payment_id);
+        },
+      });
+      rzp.open();
+    }
+  </script>
+</body>
+</html>

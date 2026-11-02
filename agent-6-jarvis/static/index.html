@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jarvis</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0f14">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #131a22;
+    --text: #e8edf2;
+    --muted: #8ea0b3;
+    --accent: #4fd1c5;
+    --accent-active: #ff6b6b;
+    --border: #223140;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  body {
+    display: flex; flex-direction: column; align-items: center;
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+    min-height: 100%;
+    position: relative;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: url('/car-bg.svg') center 62% no-repeat;
+    background-size: min(85vw, 640px) auto;
+    opacity: 0.07;
+    z-index: 0;
+    pointer-events: none;
+  }
+  header, #log, #unsupported, footer { position: relative; z-index: 1; }
+  header { width: 100%; max-width: 480px; padding: 20px 0 8px; text-align: center; }
+  header h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+  header p { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+  #lang-toggle {
+    margin-top: 8px; padding: 4px 12px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em; cursor: pointer;
+  }
+  #lang-toggle.ml { border-color: var(--accent); color: var(--accent); }
+
+  #log {
+    width: 100%; max-width: 480px; flex: 1; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px; padding: 16px 2px 24px;
+  }
+  .bubble {
+    padding: 10px 14px; border-radius: 14px; max-width: 85%;
+    font-size: 15px; line-height: 1.4; white-space: pre-wrap;
+  }
+  .bubble.user { align-self: flex-end; background: var(--accent); color: #06201d; border-bottom-right-radius: 4px; }
+  .bubble.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .bubble.system { align-self: center; color: var(--muted); font-size: 12px; background: none; }
+  .bubble .action-link {
+    display: inline-block; margin-top: 8px; padding: 6px 14px;
+    background: var(--accent); color: #06201d; border-radius: 8px;
+    font-size: 13px; font-weight: 600; text-decoration: none;
+  }
+
+  footer {
+    width: 100%; max-width: 480px; padding: 12px 0 max(16px, env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  #status { color: var(--muted); font-size: 13px; min-height: 16px; }
+  #mic {
+    width: 84px; height: 84px; border-radius: 50%; border: none;
+    background: var(--panel); border: 2px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform 0.15s, background 0.15s, border-color 0.15s;
+    touch-action: manipulation;
+  }
+  #mic:active { transform: scale(0.95); }
+  #mic.armed { border-color: var(--accent); background: #0f2420; animation: armedPulse 2.4s infinite; }
+  #mic.listening { border-color: var(--accent-active); background: #2a1414; animation: pulse 1.4s infinite; }
+  #mic svg { width: 32px; height: 32px; fill: var(--accent); }
+  #mic.listening svg { fill: var(--accent-active); }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,107,107,0.4); }
+    70% { box-shadow: 0 0 0 16px rgba(255,107,107,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,107,107,0); }
+  }
+  @keyframes armedPulse {
+    0% { box-shadow: 0 0 0 0 rgba(79,209,197,0.35); }
+    70% { box-shadow: 0 0 0 14px rgba(79,209,197,0); }
+    100% { box-shadow: 0 0 0 0 rgba(79,209,197,0); }
+  }
+  #unsupported {
+    display: none; max-width: 480px; text-align: center; color: var(--muted);
+    font-size: 13px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Jarvis</h1>
+    <p id="endpoint-label">connecting…</p>
+    <button id="lang-toggle" aria-label="Toggle recognition language">EN</button>
+  </header>
+
+  <div id="log"></div>
+  <div id="unsupported">
+    Speech recognition isn't supported in this browser. Try Chrome on Android.
+    Text-to-speech replies will still work if you type instead.
+  </div>
+
+  <footer>
+    <div id="status">tap the mic to enable "hey Jarvis"</div>
+    <button id="mic" aria-label="Talk to Jarvis">
+      <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+    </button>
+  </footer>
+
+<script>
+const API_BASE = location.origin;
+const logEl = document.getElementById('log');
+const statusEl = document.getElementById('status');
+const micBtn = document.getElementById('mic');
+const langBtn = document.getElementById('lang-toggle');
+const endpointLabel = document.getElementById('endpoint-label');
+endpointLabel.textContent = API_BASE.replace(/^https?:\/\//, '');
+
+let history = [];
+let listening = false;
+let currentLocation = null; // {lat, lon, speed} from the phone's real GPS, if granted
+
+// Manual toggle only — Chrome's SpeechRecognition takes one fixed language
+// per instance, it can't auto-detect code-switching mid-sentence. The wake
+// phrase stays the English "hey Jarvis" in both modes (recognized as a
+// loanword reasonably well even in ml-IN mode); everything said after it
+// is transcribed in whichever language is currently selected.
+let currentLang = localStorage.getItem('jarvisLang') || 'en-US';
+langBtn.textContent = currentLang === 'ml-IN' ? 'ML' : 'EN';
+langBtn.classList.toggle('ml', currentLang === 'ml-IN');
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('jarvisLang', lang);
+  langBtn.textContent = lang === 'ml-IN' ? 'ML' : 'EN';
+  langBtn.classList.toggle('ml', lang === 'ml-IN');
+  // recognition.lang isn't set here — startWakeListening/startCommandListening
+  // set it per-mode on every start() (wake always 'en-US', command uses this).
+}
+langBtn.addEventListener('click', () => {
+  const wasArmed = armed;
+  if (wasArmed) disableAlwaysListening();
+  setLang(currentLang === 'ml-IN' ? 'en-US' : 'ml-IN');
+  if (wasArmed) enableAlwaysListening();
+});
+
+// Jarvis is deployed public, so every /query call must carry this PIN —
+// prompted once and cached in localStorage after that. get_document hands
+// back links to personal ID documents, so this isn't optional.
+let jarvisPin = localStorage.getItem('jarvisPin') || '';
+function ensurePin() {
+  while (!jarvisPin) {
+    const entered = prompt('Enter Jarvis PIN:');
+    if (entered) jarvisPin = entered.trim();
+  }
+  localStorage.setItem('jarvisPin', jarvisPin);
+}
+ensurePin();
+
+const SPEED_ALERT_KMH = 60;
+let speedAlerted = false; // one-shot per above-threshold stretch, resets when back under
+
+function watchLocation() {
+  if (!('geolocation' in navigator)) return;
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      currentLocation = {
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        // GPS-derived ground speed in m/s; null when the device can't
+        // determine it (e.g. stationary, or no compatible sensor).
+        speed: pos.coords.speed,
+      };
+      checkSpeedAlert(pos.coords.speed);
+    },
+    () => { currentLocation = null; },
+    { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
+  );
+}
+watchLocation();
+
+// Daily trip distance is tracked by the standalone Jarvis Tracker Android
+// app (agent-6-jarvis/android-tracker/), not here — a browser tab can't
+// sustain GPS updates through screen-lock or backgrounding (e.g. this same
+// page losing focus when navigate_to/play_music hand off to Maps/YouTube)
+// for more than a few minutes, which a foreground service with background
+// location access can. Keeping tracking in exactly one place also avoids
+// two independent clients' cumulative totals overwriting each other via
+// /trip/distance's overwrite (not additive) semantics.
+
+function checkSpeedAlert(speedMs) {
+  if (speedMs == null) return;
+  const kmh = speedMs * 3.6;
+  if (kmh > SPEED_ALERT_KMH) {
+    if (!speedAlerted) {
+      speedAlerted = true;
+      speakAlert('You are above 60 kilometers per hour — that may impact mileage.');
+    }
+  } else {
+    speedAlerted = false; // re-arm so crossing 60 again re-triggers the alert
+  }
+}
+
+// Relying on youtube.com/google.com App Links to hand off to the native
+// app is unreliable — Android silently falls back to the browser if the
+// user ever picked "open in Chrome" once for that domain, and Chrome then
+// mutes autoplay because this navigation happens after an async fetch, not
+// a fresh user gesture (same root cause as popup-blocking). An explicit
+// Android intent URL forces the target app open directly when installed,
+// with browser_fallback_url preserving today's plain-link behavior
+// everywhere else (desktop, iOS, app not installed).
+function toAndroidIntentUrl(url) {
+  if (!/Android/i.test(navigator.userAgent)) return url;
+  let parsed;
+  try { parsed = new URL(url); } catch (e) { return url; }
+
+  let pkg = null;
+  if (parsed.hostname === 'www.youtube.com' || parsed.hostname === 'youtube.com' || parsed.hostname === 'youtu.be') {
+    pkg = 'com.google.android.youtube';
+  } else if (parsed.hostname === 'www.google.com' && parsed.pathname.startsWith('/maps')) {
+    pkg = 'com.google.android.apps.maps';
+  }
+  if (!pkg) return url;
+
+  const scheme = parsed.protocol.replace(':', '');
+  const rest = url.slice(url.indexOf('://') + 3); // host + path + query, scheme stripped
+  return `intent://${rest}#Intent;scheme=${scheme};package=${pkg};S.browser_fallback_url=${encodeURIComponent(url)};end`;
+}
+
+function actionLabel(url) {
+  try {
+    const host = new URL(url).hostname;
+    if (host.includes('youtube')) return 'Open in YouTube ▸';
+    if (host.includes('google.com')) return 'Open in Maps ▸';
+  } catch (e) {}
+  return 'Open link ▸';
+}
+
+// actionUrl is rendered as a real tappable link, not auto-navigated to —
+// Chrome only launches an external app (via the intent:// URL below) in
+// response to a genuine user gesture, and a voice command triggered via
+// SpeechRecognition + an awaited fetch() doesn't count as one. A real tap
+// does, and opening in a new tab (instead of `location.href =`) also
+// avoids replacing this page and killing the running conversation/mic
+// session when the intent falls back to a plain browser link.
+function addBubble(role, text, actionUrl) {
+  const div = document.createElement('div');
+  div.className = 'bubble ' + role;
+  div.textContent = text;
+  if (actionUrl) {
+    const link = document.createElement('a');
+    link.className = 'action-link';
+    link.href = toAndroidIntentUrl(actionUrl);
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = actionLabel(actionUrl);
+    div.appendChild(document.createElement('br'));
+    div.appendChild(link);
+  }
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setStatus(text) { statusEl.textContent = text; }
+
+async function sendToJarvis(message) {
+  addBubble('user', message);
+  setStatus('thinking…');
+  try {
+    const resp = await fetch(API_BASE + '/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history, location: currentLocation, pin: jarvisPin }),
+    });
+    if (resp.status === 401) {
+      localStorage.removeItem('jarvisPin');
+      jarvisPin = '';
+      ensurePin();
+      throw new Error('wrong PIN — try again');
+    }
+    if (!resp.ok) throw new Error('server error ' + resp.status);
+    const data = await resp.json();
+    history.push({ role: 'user', content: message });
+    history.push({ role: 'assistant', content: data.reply });
+
+    addBubble('assistant', data.reply, data.action_url);
+    speak(data.reply);
+  } catch (err) {
+    addBubble('system', 'Error: ' + err.message);
+    setStatus('tap the mic and speak');
+  }
+}
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) { afterSpeaking(); return; }
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = currentLang;
+  utter.rate = 1.02;
+  utter.onend = afterSpeaking;
+  setStatus('speaking…');
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utter);
+}
+
+function afterSpeaking() {
+  if (armed) startWakeListening();
+  else setStatus('tap the mic to enable "hey Jarvis"');
+}
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const WAKE_PHRASE = /\bhey,?\s*jarvis\b/i;
+
+let armed = false;      // always-listening mode is on
+let mode = 'idle';      // 'wake' | 'command' | 'processing'
+let wakeDetected = false;
+let pendingCommand = null;
+let recognition = null; // top-level (not block-scoped) so checkSpeedAlert() can reach it
+
+// Interrupts current speech/listening to speak a system alert (e.g. the
+// speed warning), then falls back into the normal wake-listening restart
+// path exactly like a regular reply does — same 'processing' mechanism
+// handleCommand() uses, so there's no separate restart logic to keep in sync.
+function speakAlert(text) {
+  addBubble('system', text);
+  if (recognition && mode !== 'processing') {
+    mode = 'processing';
+    try { recognition.stop(); } catch (e) {}
+  }
+  speak(text);
+}
+
+function enableAlwaysListening() {
+  if (!recognition || armed) return;
+  armed = true;
+  micBtn.classList.add('armed');
+  startWakeListening();
+}
+
+function disableAlwaysListening() {
+  armed = false;
+  mode = 'idle';
+  micBtn.classList.remove('armed', 'listening');
+  if (recognition) { try { recognition.stop(); } catch (e) {} }
+  speechSynthesis.cancel();
+  setStatus('tap the mic to enable "hey Jarvis"');
+}
+
+// Android's speech service needs a beat to fully release the mic session
+// after stop() before a new start() will succeed — calling start() right
+// away (as onend used to) sometimes throws InvalidStateError, which was
+// being swallowed silently, leaving the mic dead until a manual re-tap.
+// This delays + dedupes restarts so back-to-back triggers (e.g. onend and
+// a visibilitychange firing close together) don't stack into a start()
+// race.
+let restartTimer = null;
+function scheduleRestart(fn, delay = 300) {
+  if (restartTimer) clearTimeout(restartTimer);
+  restartTimer = setTimeout(() => { restartTimer = null; fn(); }, delay);
+}
+
+function startWakeListening() {
+  if (!armed || !recognition) return;
+  mode = 'wake';
+  wakeDetected = false;
+  // Always English here, independent of the EN/ML toggle. WAKE_PHRASE
+  // only matches "hey jarvis" transcribed in English — an ml-IN recognizer
+  // transcribes that English phrase into something that never matches it,
+  // so wake detection would never succeed in ML mode and the session
+  // would just run until Android's silence timeout kills it, restart,
+  // time out again, etc. — a tight beep loop with no way out. The
+  // selected language only applies once past wake detection, in
+  // startCommandListening below.
+  recognition.lang = 'en-US';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  micBtn.classList.remove('listening');
+  setStatus('say "hey Jarvis"…');
+  try { recognition.start(); } catch (e) { scheduleRestart(startWakeListening); }
+}
+
+function startCommandListening() {
+  if (!recognition) return;
+  mode = 'command';
+  recognition.lang = currentLang;
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  micBtn.classList.add('listening');
+  setStatus('listening…');
+  try { recognition.start(); } catch (e) { scheduleRestart(startCommandListening); }
+}
+
+function handleCommand(transcript) {
+  mode = 'processing';
+  speechSynthesis.cancel();
+  sendToJarvis(transcript);
+}
+
+if (!SpeechRecognition) {
+  document.getElementById('unsupported').style.display = 'block';
+  micBtn.disabled = true;
+} else {
+  recognition = new SpeechRecognition();
+  recognition.lang = currentLang;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    listening = mode === 'command';
+  };
+
+  recognition.onresult = (event) => {
+    if (mode === 'wake') {
+      let finalText = '';
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) finalText += event.results[i][0].transcript + ' ';
+      }
+      finalText = finalText.toLowerCase();
+      if (!wakeDetected && WAKE_PHRASE.test(finalText)) {
+        wakeDetected = true;
+        const after = finalText.split(WAKE_PHRASE)[1]?.trim();
+        pendingCommand = after && after.length > 2 ? after : null;
+        recognition.stop();
+      }
+    } else if (mode === 'command') {
+      const transcript = event.results[0][0].transcript.trim();
+      if (transcript) handleCommand(transcript);
+    }
+  };
+
+  recognition.onerror = (event) => {
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      armed = false;
+      micBtn.classList.remove('armed', 'listening');
+      setStatus('mic permission denied — tap to retry');
+      return;
+    }
+    // 'no-speech' / 'aborted' are routine in continuous wake mode — onend
+    // below restarts listening, nothing to surface to the user here.
+  };
+
+  recognition.onend = () => {
+    listening = false;
+    micBtn.classList.remove('listening');
+    if (!armed) { mode = 'idle'; return; }
+
+    if (mode === 'wake') {
+      if (wakeDetected) {
+        wakeDetected = false;
+        if (pendingCommand) {
+          const cmd = pendingCommand;
+          pendingCommand = null;
+          handleCommand(cmd);
+        } else {
+          scheduleRestart(startCommandListening);
+        }
+      } else {
+        scheduleRestart(startWakeListening); // continuous mode hit a silence timeout — keep listening
+      }
+    } else if (mode === 'command') {
+      scheduleRestart(startWakeListening); // no command heard — back to waiting for the wake phrase
+    }
+    // mode === 'processing': afterSpeaking() restarts wake listening once TTS finishes.
+  };
+
+  micBtn.addEventListener('click', () => {
+    if (armed) disableAlwaysListening();
+    else enableAlwaysListening();
+  });
+}
+
+// Mobile browsers suspend the mic/recognition session once this tab is
+// backgrounded (e.g. the user tapped over to the YouTube/Maps app that
+// just opened) — a web page cannot keep listening while another app has
+// foreground focus, full stop. This just makes sure wake-word listening
+// resumes the instant the user switches back to this tab, instead of
+// silently staying dead until they re-tap the mic button.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && armed) {
+    scheduleRestart(startWakeListening);
+  }
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+langchain
+langgraph
+langchain-anthropic
+python-dotenv
+ddgs
+fastapi
+uvicorn[standard]
+requests
+pyttsx3
+SpeechRecognition
+PyAudio
+google-api-python-client
+google-auth

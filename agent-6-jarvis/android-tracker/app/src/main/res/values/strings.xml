@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">Jarvis Tracker</string>
+    <string name="notif_channel_name">Trip tracking</string>
+    <string name="notif_status_starting">Starting…</string>
+    <string name="notif_status_tracking">%.2f km tracked today</string>
+
+    <string name="hint_backend_url">Backend URL, e.g. https://jarvis-xxxx.run.app</string>
+    <string name="hint_pin">Jarvis PIN</string>
+
+    <string name="action_save">Save</string>
+    <string name="action_grant_permissions">Grant location + notification permission</string>
+    <string name="action_background_location">Allow background location</string>
+    <string name="action_battery_optimization">Ignore battery optimizations</string>
+    <string name="action_start">Start tracking</string>
+    <string name="action_stop">Stop tracking</string>
+
+    <string name="saved">Saved</string>
+    <string name="grant_foreground_first">Grant location permission first</string>
+    <string name="set_backend_url_first">Set the backend URL and save first</string>
+    <string name="grant_permissions_first">Grant all permissions above before starting</string>
+    <string name="status_km_today">%.2f km tracked today · service %s</string>
+</resources>

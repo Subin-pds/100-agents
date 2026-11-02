@@ -5,6 +5,7 @@ env/
 
 # Environment variables — never commit secrets
 .env
+*service-account*.json
 
 # Python cache
 __pycache__/
@@ -26,6 +27,9 @@ build/
 *.egg-info/
 *.egg
 
+# Claude Code
+CLAUDE.md
+
 # IDE
 .vscode/
 .idea/
@@ -42,3 +46,44 @@ logs/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Android / Gradle (build/ and .idea/ above already cover the rest)
+android-tracker/.gradle/
+android-tracker/local.properties
+android-tracker/**/*.iml
+android-tracker/captures/
+android-tracker/.cxx/
+
+# Agent 7 — personal finance data (real transactions, never commit)
+agent-7/data/*.db
+agent-7/data/takeout/
+
+# Agent 8 — personal career profile (never commit)
+agent-8/profile.md
+agent-8-crewai/profile.md
+node_modules/
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+token*.json
+client_secret*
+*secret_key*
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+AzuriteConfig
+__azurite*
+__blobstorage__/
+__queuestorage__/
+*.safetensors
+*.gguf
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.onnx
+*.lnk
